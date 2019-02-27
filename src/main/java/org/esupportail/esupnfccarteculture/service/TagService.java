@@ -83,7 +83,7 @@ public class TagService {
 			Salle salle = Salle.findSallesByNomEquals(nomSalle).getSingleResult();
 			if (!salle.getTypeSalle().equals(TypeSalleInscription.getTypeSalleInscriptionSingleton().toString())) {
 				TypeSalle typeSalle = getTypeSalle(salle.getTypeSalle());
-				if(etudiant.getCoupons().get(typeSalle.getNom()) != null && (etudiant.getCoupons().get(typeSalle.getNom()) > 0 || etudiant.getCoupons().get(TypeSalleJoker.JOKER_NAME) > 0)) {
+				if((etudiant.getCoupons().get(typeSalle.getNom()) != null && (etudiant.getCoupons().get(typeSalle.getNom()) > 0) || etudiant.getCoupons().get(TypeSalleJoker.JOKER_NAME) > 0)) {
 					log.info("Etudiant " + etudiant.getEppn() + " check OK for : " + salle.getNom());
 				} else {
 					log.info("L'etudiant " + etudiant.getEppn() + " n'a plus de coupon " + typeSalle.getNom() + " lors du check");
@@ -103,7 +103,7 @@ public class TagService {
 		try {
 			salle = Salle.findSallesByNomEquals(nomSalle).getSingleResult();
 			TypeSalle typeSalle = getTypeSalle(salle.getTypeSalle());
-			if(etudiant.getCoupons().get(typeSalle.getNom()) > 0) {
+			if(etudiant.getCoupons().get(typeSalle.getNom()) != null && etudiant.getCoupons().get(typeSalle.getNom()) > 0) {
 				etudiant.getCoupons().replace(typeSalle.getNom(), etudiant.getCoupons().get(typeSalle.getNom()) - 1);
 				log.info("Etudiant " + etudiant.getEppn() + " debit OK for : " + salle.getNom() + " du type " + typeSalle.getNom());
 				debitOk = true;

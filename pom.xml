@@ -512,6 +512,7 @@
 					<uriEncoding>UTF-8</uriEncoding>
 					<path>/</path>
 					<ajpPort>8011</ajpPort>
+					<port>8080</port>
 				</configuration>
 			</plugin>
 			<plugin>
