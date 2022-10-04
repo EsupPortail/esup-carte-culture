@@ -17,13 +17,13 @@
  */
 package org.esupportail.esupnfccarteculture.web;
 
-import javax.servlet.http.HttpServletRequest;
-
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
+
+import javax.servlet.http.HttpServletRequest;
 
 @RequestMapping("/")
 @Controller
@@ -33,6 +33,7 @@ public class IndexController {
 	public String index(HttpServletRequest request, Model uiModel) {
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 		String eppn = auth.getName();
+		uiModel.addAttribute("eppn", eppn);
 		if(!eppn.equals("anonymousUser")) {
 			if(request.isUserInRole("ROLE_ADMIN")) {
 				return "redirect:/manager/taglogs?page=1&amp;size=10";
@@ -44,13 +45,13 @@ public class IndexController {
 				return "redirect:/etudiant";
 			}
 		} else {
-			return "index";
+			return "thymeleaf/index";
 		}
 
 	}
 	
-	@RequestMapping("/login")
-	public String login(HttpServletRequest request, Model uiModel) {
+	@RequestMapping("login/shibentry")
+	public String login(HttpServletRequest request) {
 		if(request.isUserInRole("ROLE_ADMIN")) {
 			return "redirect:/manager/taglogs?page=1&amp;size=10";
 		} else if(request.isUserInRole("ROLE_MANAGER")) {

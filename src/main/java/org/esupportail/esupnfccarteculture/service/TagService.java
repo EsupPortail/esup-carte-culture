@@ -17,26 +17,28 @@
  */
 package org.esupportail.esupnfccarteculture.service;
 
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import org.esupportail.esupnfccarteculture.domain.Etudiant;
-import org.esupportail.esupnfccarteculture.domain.Salle;
-import org.esupportail.esupnfccarteculture.domain.TagLog;
-import org.esupportail.esupnfccarteculture.domain.TypeSalle;
-import org.esupportail.esupnfccarteculture.domain.TypeSalleInscription;
-import org.esupportail.esupnfccarteculture.domain.TypeSalleJoker;
+import org.esupportail.esupnfccarteculture.entity.*;
+import org.esupportail.esupnfccarteculture.repository.EtudiantRepository;
+import org.esupportail.esupnfccarteculture.repository.SalleRepository;
+import org.esupportail.esupnfccarteculture.repository.TagLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.stereotype.Service;
 
-@Service
+import javax.annotation.Resource;
+import javax.persistence.NoResultException;
+import java.util.*;
+import java.util.stream.Collectors;
+
 public class TagService {
+
+	@Resource
+	private SalleRepository salleRepository;
+
+	@Resource
+	private TagLogRepository tagLogRepository;
+
+	@Resource
+	private EtudiantRepository etudiantRepository;
 
 	private final Logger log = LoggerFactory.getLogger(TagService.class);
 
@@ -72,26 +74,41 @@ public class TagService {
 	}
 	
 	public String checkEtudiant(String eppn, String nomSalle) {
-		if(Etudiant.countFindEtudiantsByEppnEquals(eppn) > 0) {
-			return checkEtudiant(Etudiant.findEtudiantsByEppnEquals(eppn).getSingleResult(), nomSalle);
+		if(etudiantRepository.countFindEtudiantsByEppnEquals(eppn) > 0) {
+			return checkEtudiant(etudiantRepository.findEtudiantsByEppnEquals(eppn).getSingleResult(), nomSalle);
 		}
 		return null;
 	}
 	
 	public String checkEtudiant(Etudiant etudiant, String nomSalle) {
 		try {
-			Salle salle = Salle.findSallesByNomEquals(nomSalle).getSingleResult();
+			Salle salle = salleRepository.findSallesByNomEquals(nomSalle).getSingleResult();
 			if (!salle.getTypeSalle().equals(TypeSalleInscription.getTypeSalleInscriptionSingleton().toString())) {
 				TypeSalle typeSalle = getTypeSalle(salle.getTypeSalle());
-				if((etudiant.getCoupons().get(typeSalle.getNom()) != null && (etudiant.getCoupons().get(typeSalle.getNom()) > 0) || etudiant.getCoupons().get(TypeSalleJoker.JOKER_NAME) > 0)) {
+				if(etudiant.getCoupons() != null && (etudiant.getCoupons().get(typeSalle.getNom()) != null && (etudiant.getCoupons().get(typeSalle.getNom()) > 0) || etudiant.getCoupons().get(TypeSalleJoker.JOKER_NAME) > 0)) {
 					log.info("Etudiant " + etudiant.getEppn() + " check OK for : " + salle.getNom());
 				} else {
 					log.info("L'etudiant " + etudiant.getEppn() + " n'a plus de coupon " + typeSalle.getNom() + " lors du check");
 					return etudiant.getPrenom() + " " + etudiant.getNom() + ":\nPlus de coupon " + typeSalle.getNom();
 				}
 			}
-		} catch (EmptyResultDataAccessException e) {
+		} catch (NoResultException e) {
 			log.warn("Etudiant " + etudiant.getEppn() + " non trouvé lors du check", e);
+			return "Pas de carte culture :\ncarte inactive";
+		}
+		return null;
+	}
+
+	public String checkEtudiantCoupon(String eppn, String nomSalle) {
+		try {
+			Etudiant etudiant = etudiantRepository.findEtudiantsByEppnEquals(eppn).getSingleResult();
+			Salle salle = salleRepository.findSallesByNomEquals(nomSalle).getSingleResult();
+			if (!salle.getTypeSalle().equals(TypeSalleInscription.getTypeSalleInscriptionSingleton().toString())) {
+				TypeSalle typeSalle = getTypeSalle(salle.getTypeSalle());
+				return etudiant.getCoupons().get(typeSalle.getNom()) + etudiant.getCoupons().get(TypeSalleJoker.JOKER_NAME) + "";
+			}
+		} catch (NoResultException e) {
+			log.warn("Etudiant " + eppn + " non trouvé lors du check", e);
 			return "Pas de carte culture :\ncarte inactive";
 		}
 		return null;
@@ -101,13 +118,13 @@ public class TagService {
 		boolean debitOk = false;
 		Salle salle = null;
 		try {
-			salle = Salle.findSallesByNomEquals(nomSalle).getSingleResult();
+			salle = salleRepository.findSallesByNomEquals(nomSalle).getSingleResult();
 			TypeSalle typeSalle = getTypeSalle(salle.getTypeSalle());
-			if(etudiant.getCoupons().get(typeSalle.getNom()) != null && etudiant.getCoupons().get(typeSalle.getNom()) > 0) {
+			if(etudiant.getCoupons() != null && etudiant.getCoupons().get(typeSalle.getNom()) != null && etudiant.getCoupons().get(typeSalle.getNom()) > 0) {
 				etudiant.getCoupons().replace(typeSalle.getNom(), etudiant.getCoupons().get(typeSalle.getNom()) - 1);
 				log.info("Etudiant " + etudiant.getEppn() + " debit OK for : " + salle.getNom() + " du type " + typeSalle.getNom());
 				debitOk = true;
-			} else if(etudiant.getCoupons().get(TypeSalleJoker.JOKER_NAME) > 0) {
+			} else if(etudiant.getCoupons() != null && etudiant.getCoupons().get(TypeSalleJoker.JOKER_NAME) > 0) {
 				etudiant.getCoupons().put(TypeSalleJoker.JOKER_NAME, etudiant.getCoupons().get(TypeSalleJoker.JOKER_NAME) - 1);
 				log.info("Etudiant " + etudiant.getEppn() + " debit OK for : " + salle.getNom() + " with joker");
 				debitOk = true;
@@ -117,7 +134,7 @@ public class TagService {
 			if (debitOk) {
 				createNewTagLog(etudiant, salle, eppnInit);
 			} 
-		} catch (EmptyResultDataAccessException e) {
+		} catch (NoResultException e) {
 			log.warn("Salle " + salle + " non trouvé lors du debit", e);
 		}
 		
@@ -138,7 +155,7 @@ public class TagService {
 			log.info("Recharge de " + etudiant.getEppn());
 	        Map<String, Integer> coupons = new HashMap<String, Integer>();
 	        for(TypeSalle typeSalle : getTypeSallesDebitables()) {
-	        	coupons.put(typeSalle.getNom(), typeSalle.getMaxCoupon());
+	        	coupons.put(typeSalle.getNom(), typeSalle.getMaxCoupon().get(etudiant.getTypeEtudiant()));
 	        }
 	        etudiant.setCoupons(coupons);
 	        etudiant.setNbRecharge(etudiant.getNbRecharge() + 1);
@@ -156,7 +173,7 @@ public class TagService {
 		tagLog.setSalle(salle);
 		tagLog.setTarif(salle.getTarif());
 		tagLog.setEppnInit(eppnInit);
-		tagLog.persist();
+		tagLogRepository.persist(tagLog);
 	}
 
 	

@@ -17,9 +17,9 @@
  */
 package org.esupportail.esupnfccarteculture.service;
 
-import java.util.Calendar;
-
 import org.springframework.stereotype.Service;
+
+import java.util.Calendar;
 
 @Service
 public class UtilsService {

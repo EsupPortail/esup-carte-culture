@@ -17,8 +17,23 @@
  */
 package org.esupportail.esupnfccarteculture.service;
 
-import static org.springframework.ldap.query.LdapQueryBuilder.query;
+import org.apache.commons.lang3.StringUtils;
+import org.esupportail.esupnfccarteculture.entity.Etudiant;
+import org.esupportail.esupnfccarteculture.ldap.PersonLdap;
+import org.esupportail.esupnfccarteculture.ldap.PersonLdapDao;
+import org.esupportail.esupnfccarteculture.repository.EtudiantRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.ldap.core.AttributesMapper;
+import org.springframework.ldap.core.LdapTemplate;
+import org.springframework.ldap.core.support.LdapContextSource;
 
+import javax.annotation.Resource;
+import javax.naming.NamingEnumeration;
+import javax.naming.NamingException;
+import javax.naming.directory.Attribute;
+import javax.naming.directory.Attributes;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -26,35 +41,23 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.naming.NamingEnumeration;
-import javax.naming.NamingException;
-import javax.naming.directory.Attribute;
-import javax.naming.directory.Attributes;
+import static org.springframework.ldap.query.LdapQueryBuilder.query;
 
-import org.apache.commons.lang3.StringUtils;
-import org.esupportail.esupnfccarteculture.domain.Etudiant;
-import org.esupportail.esupnfccarteculture.ldap.PersonLdap;
-import org.esupportail.esupnfccarteculture.ldap.PersonLdapDao;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.ldap.core.AttributesMapper;
-import org.springframework.ldap.core.LdapTemplate;
-import org.springframework.ldap.core.support.LdapContextSource;
-import org.springframework.stereotype.Service;
-
-@Service
 public class EtudiantService {
 
 	@Autowired
 	List<PersonLdapDao> personDaos;
-	
+
+	@Resource
+	private EtudiantRepository etudiantRepository;
+
 	private final Logger log = LoggerFactory.getLogger(getClass());
 
 	private String autorizedStudentLdapFilter = "";
 	private String eppnFilterRegex = "";
 	private boolean affichageDetailCoupons;
 	private boolean preInscription;
+	private boolean preInscriptionRecharge;
 	private String preInscriptionNomSalle = "pre-inscription";
 	private String ldapCsnSearchAttribut;
 	private String ldapCsnMultiValueTagExtractRegex;
@@ -124,6 +127,14 @@ public class EtudiantService {
 		this.preInscription = preInscription;
 	}
 
+	public boolean isPreInscriptionRecharge() {
+		return preInscriptionRecharge;
+	}
+
+	public void setPreInscriptionRecharge(boolean preInscriptionRecharge) {
+		this.preInscriptionRecharge = preInscriptionRecharge;
+	}
+
 	public void updateEtudiant(Etudiant etudiant) throws Exception {
 		PersonLdap person = getPersonFromEppn(etudiant.getEppn());
 		if(person != null) {
@@ -151,6 +162,7 @@ public class EtudiantService {
 		} else {
 			log.warn("Etudiant non trouvé dans le LDAP " + etudiant.getEppn());
 		}
+		etudiantRepository.merge(etudiant);
 	}
 
 	public PersonLdap getPersonFromEppn(String eppn) {
@@ -162,9 +174,11 @@ public class EtudiantService {
 					log.info(eppn + " trouvé dans ldap : " + contextSource.getUrls()[0]);
 					return  persons.get(0);
 				} else {
-					log.warn(eppn + " non trouvé dans ldap : " + contextSource.getUrls()[0]);
+					log.warn("eppn : " + eppn + " non trouvé dans ldap : " + contextSource.getUrls()[0]);
 				}
 			}
+		} else {
+			log.warn(eppn + " mauvais domaine");
 		}
 		return null;
 	}
@@ -174,10 +188,10 @@ public class EtudiantService {
 			LdapContextSource contextSource = (LdapContextSource) personLdapDao.getLdapTemplate().getContextSource();
 			List<PersonLdap> persons = personLdapDao.getPersonLdaps(getLdapCsnSearchAttribut(), getLdapCsnMultiValueTag() + csn.toUpperCase());
 			if (persons.size() > 0 && persons.get(0) != null && persons.get(0).getEduPersonPrincipalName().matches(eppnFilterRegex)) {
-				log.info(csn + " trouvé dans ldap" + contextSource.getUrls()[0]);
+				log.info("csn : " + csn + " trouvé dans " + contextSource.getUrls()[0]);
 				return  persons.get(0);
 			} else {
-				log.warn(csn + " non trouvé dans ldap" + contextSource.getUrls()[0]);
+				log.warn("csn : " + csn + " non trouvé dans " + contextSource.getUrls()[0]);
 			}
 			
 		}

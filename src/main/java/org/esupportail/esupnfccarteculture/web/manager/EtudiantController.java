@@ -17,6 +17,35 @@
  */
 package org.esupportail.esupnfccarteculture.web.manager;
 
+import org.esupportail.esupnfccarteculture.entity.*;
+import org.esupportail.esupnfccarteculture.repository.EtudiantRepository;
+import org.esupportail.esupnfccarteculture.repository.GestionnaireRepository;
+import org.esupportail.esupnfccarteculture.repository.SalleRepository;
+import org.esupportail.esupnfccarteculture.repository.TagLogRepository;
+import org.esupportail.esupnfccarteculture.service.EtudiantService;
+import org.esupportail.esupnfccarteculture.service.ExportService;
+import org.esupportail.esupnfccarteculture.service.TagService;
+import org.esupportail.esupnfccarteculture.service.UtilsService;
+import org.joda.time.format.DateTimeFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.supercsv.io.CsvBeanWriter;
+import org.supercsv.io.ICsvBeanWriter;
+import org.supercsv.prefs.CsvPreference;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -26,46 +55,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.validation.Valid;
-
-import org.esupportail.esupnfccarteculture.domain.EsupNfcTagLog;
-import org.esupportail.esupnfccarteculture.domain.Etudiant;
-import org.esupportail.esupnfccarteculture.domain.ExportEmails;
-import org.esupportail.esupnfccarteculture.domain.Gestionnaire;
-import org.esupportail.esupnfccarteculture.domain.Salle;
-import org.esupportail.esupnfccarteculture.domain.TagLog;
-import org.esupportail.esupnfccarteculture.domain.TypeSalleInscription;
-import org.esupportail.esupnfccarteculture.service.EtudiantService;
-import org.esupportail.esupnfccarteculture.service.ExportService;
-import org.esupportail.esupnfccarteculture.service.TagService;
-import org.esupportail.esupnfccarteculture.service.UtilsService;
-import org.joda.time.format.DateTimeFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.roo.addon.web.mvc.controller.scaffold.RooWebScaffold;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Controller;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.ui.Model;
-import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.supercsv.io.CsvBeanWriter;
-import org.supercsv.io.ICsvBeanWriter;
-import org.supercsv.prefs.CsvPreference;
-
 @RequestMapping("/manager/etudiants")
 @Controller
-@RooWebScaffold(path = "manager/etudiants", formBackingObject = Etudiant.class, create = false)
 public class EtudiantController {
 
 	private final Logger log = LoggerFactory.getLogger(getClass());
@@ -87,6 +78,18 @@ public class EtudiantController {
 	@Resource
 	UtilsService utilsService;
 
+	@Resource
+	private SalleRepository salleRepository;
+
+	@Resource
+	private TagLogRepository tagLogRepository;
+
+	@Resource
+	private EtudiantRepository etudiantRepository;
+
+	@Resource
+	private GestionnaireRepository gestionnaireRepository;
+
 	List<String> listSearchBy = Arrays.asList("nom", "login");
 
 	void populateEditForm(Model uiModel, Etudiant etudiant) {
@@ -106,19 +109,20 @@ public class EtudiantController {
 	@RequestMapping(value = "/{id}", produces = "text/html")
 	public String show(@PathVariable("id") Long id, Model uiModel) {
 		addDateTimeFormatPatterns(uiModel);
-		Etudiant etudiant = Etudiant.findEtudiant(id);
+		Etudiant etudiant = etudiantRepository.findEtudiant(id);
 		uiModel.addAttribute("tagLog_date_date_format",
 				DateTimeFormat.patternForStyle("MM", LocaleContextHolder.getLocale()));
 		uiModel.addAttribute("etudiant", etudiant);
-		uiModel.addAttribute("taglogs", TagLog.findTagLogsByEtudiant(etudiant, "date", "desc").getResultList());
+		uiModel.addAttribute("taglogs", tagLogRepository.findTagLogsByEtudiant(etudiant, "date", "desc").getResultList());
 		uiModel.addAttribute("itemId", id);
-		uiModel.addAttribute("salles", Salle.findAllSalles());
-		return "manager/etudiants/show";
+		uiModel.addAttribute("salles", salleRepository.findAllSalles());
+		return "jsp/manager/etudiants/show";
 	}
 
+	@Transactional
 	@RequestMapping(value = "/{id}", params = "form", produces = "text/html")
 	public String updateForm(@PathVariable("id") Long id, Model uiModel) {
-		Etudiant etudiant = Etudiant.findEtudiant(id);
+		Etudiant etudiant = etudiantRepository.findEtudiant(id);
 		populateEditForm(uiModel, etudiant);
 		try {
 			etudiantService.updateEtudiant(etudiant);
@@ -126,10 +130,10 @@ public class EtudiantController {
 			log.error("erreur lors de la mise à jour de " + etudiant.getEppn(), e);
 		}
 		List<Salle> salles = new ArrayList<Salle>();
-		salles.addAll(Salle.findSalles().getResultList());
+		salles.addAll(salleRepository.findSalles().getResultList());
 		uiModel.addAttribute("salles", salles);
 		uiModel.addAttribute("recharge", tagService.checkRecharge(etudiant));
-		return "manager/etudiants/update";
+		return "jsp/manager/etudiants/update";
 	}
 
 	@RequestMapping(method = RequestMethod.PUT, produces = "text/html")
@@ -137,12 +141,12 @@ public class EtudiantController {
 			HttpServletRequest httpServletRequest) {
 		if (bindingResult.hasErrors()) {
 			populateEditForm(uiModel, etudiant);
-			return "manager/etudiants/update";
+			return "jsp/manager/etudiants/update";
 		}
-		Etudiant etudiantBackup = Etudiant.findEtudiant(etudiant.getId());
+		Etudiant etudiantBackup = etudiantRepository.findEtudiant(etudiant.getId());
 		etudiant.setCoupons(etudiantBackup.getCoupons());
 		uiModel.asMap().clear();
-		etudiant.merge();
+		etudiantRepository.merge(etudiant);
 		return "redirect:/manager/etudiants/" + etudiant.getId();
 	}
 
@@ -169,30 +173,30 @@ public class EtudiantController {
 		if (searchString == null) {
 			searchString = "";
 		}
-		List<Etudiant> etudiants = Etudiant.findEtudiants(annee, dateFilter, etablissementFilter, searchString, page,
+		List<Etudiant> etudiants = etudiantRepository.findEtudiants(annee, dateFilter, etablissementFilter, searchString, page,
 				size, sortFieldName, sortOrder).getResultList();
 
 		int sizeNo = size == null ? 10 : size.intValue();
 
-		float nrOfPages = (float) Etudiant.countFindEtudiants(annee, dateFilter, etablissementFilter, searchString,
+		float nrOfPages = (float) etudiantRepository.countFindEtudiants(annee, dateFilter, etablissementFilter, searchString,
 				page, size) / sizeNo;
 
 		uiModel.addAttribute("maxPages",
 				(int) ((nrOfPages > (int) nrOfPages || nrOfPages == 0.0) ? nrOfPages + 1 : nrOfPages));
 		uiModel.addAttribute("etablissementFilter", etablissementFilter);
 		uiModel.addAttribute("etablissements",
-				Etudiant.findEtablissements(annee, dateFilter, searchString).getResultList());
+				etudiantRepository.findEtablissements(annee, dateFilter, searchString).getResultList());
 		uiModel.addAttribute("dateFilter", dateFilter);
 		uiModel.addAttribute("searchString", searchString);
 		uiModel.addAttribute("etudiants", etudiants);
 		uiModel.addAttribute("annee", annee);
-		uiModel.addAttribute("annees", Etudiant.findAnnees());
+		uiModel.addAttribute("annees", etudiantRepository.findAnnees());
 		uiModel.addAttribute("page", page);
 		uiModel.addAttribute("size", size);
 		uiModel.addAttribute("size", size);
 		uiModel.addAttribute("queryUrl", "?annee=" + annee + "&etablissementFilter=" + etablissementFilter
 				+ "&dateFilter=" + dateFilter + "&searchString=" + searchString);
-		return "manager/etudiants/list";
+		return "jsp/manager/etudiants/list";
 	}
 
 	@RequestMapping(value = "/{id}/debitCoupon")
@@ -201,10 +205,10 @@ public class EtudiantController {
 			HttpServletRequest httpServletRequest) {
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 		String eppnInit = auth.getName();
-		Etudiant etudiant = Etudiant.findEtudiant(id);
+		Etudiant etudiant = etudiantRepository.findEtudiant(id);
 		if (tagService.checkEtudiant(etudiant, location) == null) {
 			tagService.debitCoupon(etudiant, location, eppnInit);
-			etudiant.merge();
+			etudiantRepository.merge(etudiant);
 			redirectAttrs.addFlashAttribute("messageInfo", "message_info_debit_coupon");
 		} else {
 			redirectAttrs.addFlashAttribute("messageError", "message_error_coupon");
@@ -218,12 +222,12 @@ public class EtudiantController {
 			HttpServletRequest httpServletRequest) {
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 		String eppnInit = auth.getName();
-		Etudiant etudiant = Etudiant.findEtudiant(id);
+		Etudiant etudiant = etudiantRepository.findEtudiant(id);
 		EsupNfcTagLog esupNfcTagLog = new EsupNfcTagLog();
 		esupNfcTagLog.setEppnInit(eppnInit);
 		esupNfcTagLog.setEppn(etudiant.getEppn());
-		if (Gestionnaire.countFindGestionnairesByEppnEquals(eppnInit) > 0) {
-			Gestionnaire gest = Gestionnaire.findGestionnairesByEppnEquals(eppnInit).getSingleResult();
+		if (gestionnaireRepository.countFindGestionnairesByEppnEquals(eppnInit) > 0) {
+			Gestionnaire gest = gestionnaireRepository.findGestionnairesByEppnEquals(eppnInit).getSingleResult();
 			Salle salleInscription = null;
 			for (Salle salle : gest.getSalles()) {
 				if (salle.getTypeSalle()
@@ -285,4 +289,12 @@ public class EtudiantController {
 		}
 	}
 
+    @RequestMapping(value = "/{id}", method = RequestMethod.DELETE, produces = "text/html")
+    public String delete(@PathVariable("id") Long id, @RequestParam(value = "page", required = false) Integer page, @RequestParam(value = "size", required = false) Integer size, Model uiModel) {
+        etudiantRepository.remove(id);
+        uiModel.asMap().clear();
+        uiModel.addAttribute("page", (page == null) ? "1" : page.toString());
+        uiModel.addAttribute("size", (size == null) ? "10" : size.toString());
+        return "redirect:/manager/etudiants";
+    }
 }

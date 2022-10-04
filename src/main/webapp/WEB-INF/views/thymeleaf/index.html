@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="thymeleaf/fragments/head"></head>
+<body>
+<header th:replace="thymeleaf/fragments/nav"></header>
+<main role="main">
+    <div id="content" class="content">
+        <div class="card card-body">
+            <h1>Bienvenue sur l'application Carte Culture, merci de vous authentifier</h1>
+            <button class="btn btn-primary btn-lg btn-block" onclick="window.location='/login/shibentry'">
+                <h3>Se connecter</h3>
+            </button>
+        </div>
+    </div>
+</main>
+</body>
+</html>

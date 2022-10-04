@@ -28,7 +28,7 @@
     <!-- HTTP security configurations -->
     <http disable-url-rewriting="true" use-expressions="true" entry-point-ref="http403EntryPoint">
 		<logout logout-success-url="/" />
-		<intercept-url pattern="/j_spring_security_switch_user" access="hasRole('ROLE_ADMIN')"/>
+		<intercept-url pattern="/admin/su-login" access="hasRole('ROLE_ADMIN')"/>
 		<intercept-url pattern="/admin/" access="hasRole('ROLE_ADMIN')" />
         <intercept-url pattern="/manager/" access="hasRole('ROLE_MANAGER') or hasRole('ROLE_ADMIN')" />
         <intercept-url pattern="/etudiant/**" access="isAuthenticated()" />
@@ -38,12 +38,13 @@
         <intercept-url pattern="/partenaire/**" access="hasRole('ROLE_PARTENAIRE') or hasRole('ROLE_ADMIN')" />
         <intercept-url pattern="/login/**" access="isAuthenticated()" />
         <intercept-url pattern="/nfc-ws/**" access="hasIpAddress('127.0.0.1') or hasIpAddress('Esup-NFC-Tag IP Address')" />
-        <intercept-url pattern="/**" access="permitAll" />
+		<intercept-url pattern="/ws-secure/**" access="hasIpAddress('127.0.0.1') or hasIpAddress('Esup-NFC-Tag IP Address')" />
+		<intercept-url pattern="/**" access="permitAll" />
 		<access-denied-handler error-page="/denied" />
 		<session-management session-authentication-strategy-ref="sas" />
 		<custom-filter position="PRE_AUTH_FILTER" ref="shibFilter"/>
-		<custom-filter position="SWITCH_USER_FILTER" ref="switchUserProcessingFilter" />
-		<custom-filter ref="concurrencyFilter" position="CONCURRENT_SESSION_FILTER" />
+		<custom-filter position="SWITCH_USER_FILTER" ref="switchUserFilter" />
+		<custom-filter position="CONCURRENT_SESSION_FILTER" ref="concurrencyFilter"/>
 		<csrf disabled="true"/>
     </http>
 
@@ -53,15 +54,14 @@
 	<beans:constructor-arg value="/"/>
     </beans:bean>
     
-    <beans:bean id="switchUserProcessingFilter"
-		class="org.springframework.security.web.authentication.switchuser.SwitchUserFilter">
-		<beans:property name="usernameParameter" value="j_username"/>
-		<beans:property name="userDetailsService" ref="databaseUserDetailsService" />
-		<beans:property name="switchUserUrl" value="/j_spring_security_switch_user" />
-		<beans:property name="exitUserUrl" value="/j_spring_security_logout" />
-		<beans:property name="targetUrl" value="/" />
-	</beans:bean>
-    
+<!--    <beans:bean id="switchUserProcessingFilter" class="org.springframework.security.web.authentication.switchuser.SwitchUserFilter">-->
+<!--		<beans:property name="usernameParameter" value="j_username"/>-->
+<!--		<beans:property name="userDetailsService" ref="databaseUserDetailsService" />-->
+<!--		<beans:property name="switchUserUrl" value="/admin/su-login" />-->
+<!--		<beans:property name="exitUserUrl" value="/j_spring_security_logout" />-->
+<!--		<beans:property name="targetUrl" value="/" />-->
+<!--	</beans:bean>-->
+
     <beans:bean id="shibFilter" class="org.springframework.security.web.authentication.preauth.RequestHeaderAuthenticationFilter">
 		<beans:property name="principalRequestHeader" value="REMOTE_USER"/>
 		<beans:property name="credentialsRequestHeader" value="MEMBER"/>
@@ -105,19 +105,6 @@
 		</beans:property>
 	</beans:bean>
 
-    <beans:bean id="ldapContextSourceUnivVille" class="org.springframework.ldap.core.support.LdapContextSource">
-		<beans:property name="url" value="ldap://ldap.univ-ville.fr" />
-		<beans:property name="base" value="dc=univ-ville,dc=fr" />
-		<beans:property name="userDn" value="cn=carteculture,dc=univ-ville,dc=fr" />
-		<beans:property name="password" value="XXXXXXXX" />
-	</beans:bean>   
-	
-	
-    <beans:bean id="ldapContextSourceComue" class="org.springframework.ldap.core.support.LdapContextSource">
-           <beans:property name="url" value="ldaps://ldap.comue.fr" />
-           <beans:property name="base" value="dc=comue,dc=fr" />
-           <beans:property name="userDn" value="cn=carteculture,ou=carteculture,dc=comue,dc=fr" />
-           <beans:property name="password" value="XXXXXXXX" />
-     </beans:bean>
+
 	
 </beans:beans>

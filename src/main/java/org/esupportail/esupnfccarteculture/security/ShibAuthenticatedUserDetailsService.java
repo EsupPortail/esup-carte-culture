@@ -17,13 +17,8 @@
  */
 package org.esupportail.esupnfccarteculture.security;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.commons.lang3.StringUtils;
-import org.esupportail.esupnfccarteculture.domain.Role;
+import org.esupportail.esupnfccarteculture.repository.RoleRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
@@ -33,12 +28,20 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 
+import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
 public class ShibAuthenticatedUserDetailsService
 implements AuthenticationUserDetailsService<PreAuthenticatedAuthenticationToken> {
 
-	
 	protected Map<String, String> mappingGroupesRoles;
-	
+
+	@Resource
+	private RoleRepository roleRepository;
+
 	public void setMappingGroupesRoles(Map<String, String> mappingGroupesRoles) {
 		this.mappingGroupesRoles = mappingGroupesRoles;
 	}
@@ -53,8 +56,8 @@ implements AuthenticationUserDetailsService<PreAuthenticatedAuthenticationToken>
 			}
 		}
 		
-		if(Role.countFindRolesByEppnEquals(principal)>0){
-			authorities.add(new SimpleGrantedAuthority(Role.findRolesByEppnEquals(principal).getSingleResult().getRole()));
+		if(roleRepository.countFindRolesByEppnEquals(principal)>0){
+			authorities.add(new SimpleGrantedAuthority(roleRepository.findRolesByEppnEquals(principal).getSingleResult().getRole()));
 		}
 		
 		return createUserDetails(token, authorities);

@@ -17,26 +17,28 @@
  */
 package org.esupportail.esupnfccarteculture.web.manager;
 
-import java.util.Arrays;
-import java.util.List;
-
-import javax.annotation.Resource;
-
-import org.esupportail.esupnfccarteculture.domain.Salle;
-import org.esupportail.esupnfccarteculture.domain.TagLog;
+import org.esupportail.esupnfccarteculture.entity.Salle;
+import org.esupportail.esupnfccarteculture.entity.TagLog;
+import org.esupportail.esupnfccarteculture.repository.SalleRepository;
+import org.esupportail.esupnfccarteculture.repository.TagLogRepository;
 import org.esupportail.esupnfccarteculture.service.UtilsService;
+import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.roo.addon.web.mvc.controller.scaffold.RooWebScaffold;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import javax.annotation.Resource;
+import java.util.Arrays;
+import java.util.List;
+
 @RequestMapping("/manager/taglogs")
 @Controller
-@RooWebScaffold(path = "manager/taglogs", formBackingObject = TagLog.class, create=false, update=false, delete=false)
 public class TagLogController {
 
     protected final Logger log = LoggerFactory.getLogger(this.getClass());
@@ -50,7 +52,13 @@ public class TagLogController {
 	
 	@Resource
 	UtilsService utilsService;
-	
+
+    @Resource
+    private SalleRepository salleRepository;
+
+    @Resource
+    private TagLogRepository tagLogRepository;
+
     @RequestMapping(produces = "text/html")
     public String list(
     		@RequestParam(value = "annee", required = false) Integer annee,
@@ -63,7 +71,7 @@ public class TagLogController {
     		annee = utilsService.getAnnee();
     	}
     	
-    	List<Salle> salles = Salle.findAllSalles();
+    	List<Salle> salles = salleRepository.findAllSalles();
     	    	
     	if(sortFieldName == null) {
     		sortFieldName="date";
@@ -77,13 +85,13 @@ public class TagLogController {
     	}
         int sizeNo = size == null ? 10 : size.intValue();
        
-        List<TagLog> taglogs = TagLog.findTagLogs(annee, salleFilter, dateFilter, searchString, page, size, sortFieldName, sortOrder).getResultList();
+        List<TagLog> taglogs = tagLogRepository.findTagLogs(annee, salleFilter, dateFilter, searchString, page, size, sortFieldName, sortOrder).getResultList();
 
-        float nrOfPages = (float) TagLog.countFindTagLogs(annee, salleFilter, dateFilter, searchString) / sizeNo;
+        float nrOfPages = (float) tagLogRepository.countFindTagLogs(annee, salleFilter, dateFilter, searchString) / sizeNo;
         
         addDateTimeFormatPatterns(uiModel);
         uiModel.addAttribute("annee", annee);
-    	uiModel.addAttribute("annees", TagLog.findAnnees());        
+    	uiModel.addAttribute("annees", tagLogRepository.findAnnees());
         uiModel.addAttribute("page", page);
         uiModel.addAttribute("size", size);
         uiModel.addAttribute("taglogs", taglogs);
@@ -94,7 +102,18 @@ public class TagLogController {
         uiModel.addAttribute("listSearchBy", listSearchBy);
         uiModel.addAttribute("salles", salles);
         uiModel.addAttribute("queryUrl", "?salleFilter=" + salleFilter + "&searchString=" + searchString);
-        return "manager/taglogs/list";
+        return "jsp/manager/taglogs/list";
     }
-	
-  }
+
+    @RequestMapping(value = "/{id}", produces = "text/html")
+    public String show(@PathVariable("id") Long id, Model uiModel) {
+        addDateTimeFormatPatterns(uiModel);
+        uiModel.addAttribute("taglog", tagLogRepository.findTagLog(id));
+        uiModel.addAttribute("itemId", id);
+        return "jsp/manager/taglogs/show";
+    }
+
+    void addDateTimeFormatPatterns(Model uiModel) {
+        uiModel.addAttribute("tagLog_date_date_format", DateTimeFormat.patternForStyle("MM", LocaleContextHolder.getLocale()));
+    }
+}

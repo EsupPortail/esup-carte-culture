@@ -17,21 +17,20 @@
  */
 package org.esupportail.esupnfccarteculture.service;
 
-import java.io.ByteArrayOutputStream;
-import java.io.OutputStream;
-import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.springframework.web.servlet.view.AbstractView;
-
 import com.itextpdf.text.Document;
 import com.itextpdf.text.DocumentException;
 import com.itextpdf.text.PageSize;
 import com.itextpdf.text.pdf.PdfWriter;
+import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.view.AbstractView;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.util.Map;
 
+@Service
 public abstract class AbstractITextPdfView extends AbstractView {
 	 
     public AbstractITextPdfView() {

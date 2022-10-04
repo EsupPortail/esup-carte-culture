@@ -17,34 +17,32 @@
  */
 package org.esupportail.esupnfccarteculture.service;
 
+import com.itextpdf.text.*;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import org.esupportail.esupnfccarteculture.entity.FactureModel;
+import org.esupportail.esupnfccarteculture.entity.TagLog;
+import org.esupportail.esupnfccarteculture.repository.TagLogRepository;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.math.BigDecimal;
-import java.net.URL;
 import java.text.DateFormat;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.esupportail.esupnfccarteculture.domain.FactureModel;
-import org.esupportail.esupnfccarteculture.domain.TagLog;
-
-import com.itextpdf.text.BaseColor;
-import com.itextpdf.text.Document;
-import com.itextpdf.text.Font;
-import com.itextpdf.text.FontFactory;
-import com.itextpdf.text.Image;
-import com.itextpdf.text.Paragraph;
-import com.itextpdf.text.Phrase;
-import com.itextpdf.text.pdf.PdfPCell;
-import com.itextpdf.text.pdf.PdfPTable;
-import com.itextpdf.text.pdf.PdfWriter;
-
-
+@Service
 public class FacturePDFBuilder extends AbstractITextPdfView {
-	 
+
+    @Resource
+    TagLogRepository tagLogRepository;
+
     @Override
     protected void buildPdfDocument(Map<String, Object> model, Document doc,
             PdfWriter writer, HttpServletRequest request, HttpServletResponse response)
@@ -63,7 +61,7 @@ public class FacturePDFBuilder extends AbstractITextPdfView {
         List<TagLog> tagLogs = factureModel.getTagLogs();
         
         String path = request.getScheme() + "://"+request.getLocalAddr() + ":" + request.getServerPort() +"/resources/images/logo-facture.jpg";
-        Image logo = Image.getInstance(new URL(path));
+        Image logo = Image.getInstance(new ClassPathResource("images/logo-facture.jpg").getURL());
         doc.add(logo);
         doc.add(new Phrase("Carte culture", fontTitle));
         doc.add(new Paragraph(" "));

@@ -17,15 +17,15 @@
  */
 package org.esupportail.esupnfccarteculture.batch;
 
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
 import java.io.IOException;
 import java.sql.SQLException;
-
-import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 public class BatchMain {
 
 	public static void main(String[] args) throws IOException, SQLException  {
-		ClassPathXmlApplicationContext springContext = new ClassPathXmlApplicationContext("classpath*:META-INF/spring/applicationContext*.xml");
+		ClassPathXmlApplicationContext springContext = new ClassPathXmlApplicationContext("classpath*:META-INF/spring/applicationContext.xml");
 		
 		if(args.length < 1 || !"dbupgrade".equals(args[0])) {
 			System.err.println("#####\n" +

@@ -17,23 +17,13 @@
  */
 package org.esupportail.esupnfccarteculture.web.partenaire;
 
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-import javax.validation.Valid;
-
-import org.esupportail.esupnfccarteculture.domain.FactureModel;
-import org.esupportail.esupnfccarteculture.domain.Gestionnaire;
-import org.esupportail.esupnfccarteculture.domain.Salle;
-import org.esupportail.esupnfccarteculture.domain.TagLog;
-import org.esupportail.esupnfccarteculture.service.EtudiantService;
+import org.esupportail.esupnfccarteculture.entity.*;
+import org.esupportail.esupnfccarteculture.repository.EtudiantRepository;
+import org.esupportail.esupnfccarteculture.repository.GestionnaireRepository;
+import org.esupportail.esupnfccarteculture.repository.SalleRepository;
+import org.esupportail.esupnfccarteculture.repository.TagLogRepository;
+import org.esupportail.esupnfccarteculture.service.FacturePDFBuilder;
+import org.esupportail.esupnfccarteculture.service.TagService;
 import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,12 +34,20 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 
 @RequestMapping("/partenaire")
 @Controller
@@ -58,7 +56,22 @@ public class IndexPartenaireController {
 	private final Logger log = LoggerFactory.getLogger(getClass());
 
 	@Resource
-	EtudiantService etudiantService;
+	private FacturePDFBuilder facturePDFBuilder;
+
+	@Resource
+	private SalleRepository salleRepository;
+
+	@Resource
+	private TagLogRepository tagLogRepository;
+
+	@Resource
+	private EtudiantRepository etudiantRepository;
+
+	@Resource
+	private GestionnaireRepository gestionnaireRepository;
+
+	@Resource
+	TagService tagService;
 
 	@ModelAttribute("active")
 	public String getActiveMenu() {
@@ -71,10 +84,10 @@ public class IndexPartenaireController {
 		String eppn = auth.getName();
 		List<Salle> salles = null;
 		if (request.isUserInRole("ROLE_ADMIN")) {
-			salles = Salle.findAllSalles();
+			salles = salleRepository.findAllSalles();
 		} else {
-			if (Gestionnaire.countFindGestionnairesByEppnEquals(eppn) > 0) {
-				Gestionnaire gestionnaire = Gestionnaire.findGestionnairesByEppnEquals(eppn).getSingleResult();
+			if (gestionnaireRepository.countFindGestionnairesByEppnEquals(eppn) > 0) {
+				Gestionnaire gestionnaire = gestionnaireRepository.findGestionnairesByEppnEquals(eppn).getSingleResult();
 				salles = gestionnaire.getSalles();
 				if (salles.size() == 1) {
 					return "redirect:/partenaire/salle/" + salles.get(0).getId() + "/";
@@ -84,7 +97,7 @@ public class IndexPartenaireController {
 			}
 		}
 		uiModel.addAttribute("salles", salles);
-		return "partenaire/index";
+		return "jsp/partenaire/index";
 	}
 
 	@RequestMapping(value = "/salle/{id}")
@@ -97,9 +110,9 @@ public class IndexPartenaireController {
 		String eppn = auth.getName();
 		Salle salleOK = null;
 		if (request.isUserInRole("ROLE_ADMIN")) {
-			salleOK = Salle.findSalle(id);
+			salleOK = salleRepository.findSalle(id);
 		} else {
-			Gestionnaire gestionnaire = Gestionnaire.findGestionnairesByEppnEquals(eppn).getSingleResult();
+			Gestionnaire gestionnaire = gestionnaireRepository.findGestionnairesByEppnEquals(eppn).getSingleResult();
 			List<Salle> salles = gestionnaire.getSalles();
 			for (Salle salle : salles) {
 				if (salle.getId() == id) {
@@ -141,35 +154,78 @@ public class IndexPartenaireController {
 			dateFinOK = calendarFin.getTime();
 		}
 
-		tagLogs = TagLog.findTagLogsBySalleAndDateBetween(salleOK, dateDebutOK, dateFinOK).getResultList();
+		tagLogs = tagLogRepository.findTagLogsBySalleAndDateBetween(salleOK, dateDebutOK, dateFinOK).getResultList();
 
 		uiModel.addAttribute("dateDebut", dateDebut);
 		uiModel.addAttribute("dateFin", dateFin);
 		uiModel.addAttribute("taglogs", tagLogs);
 		uiModel.addAttribute("salle", salleOK);
 		uiModel.addAttribute("pdf", pdf);
-		return "partenaire/salle";
+		return "jsp/partenaire/salle";
 	}
 
 	@RequestMapping(method = RequestMethod.PUT, produces = "text/html")
 	public String update(@Valid Salle salle, BindingResult bindingResult, Model uiModel,
 			HttpServletRequest httpServletRequest) {
-		Salle salleOK = Salle.findSalle(salle.getId());
+		Salle salleOK = salleRepository.findSalle(salle.getId());
 		salleOK.setTarifString(salle.getTarifString());
-		salleOK.merge();
+		salleRepository.merge(salleOK);
 		return "redirect:/partenaire/salle/" + salle.getId() + "/";
 	}
 
+	@RequestMapping(value = "/salle/{id}/debit", method = RequestMethod.POST)
+	public String debit(@PathVariable("id") long id,
+			@RequestParam(value = "nom", required = true) String nom,
+			@RequestParam(value = "prenom", required = true) String prenom, 
+			@RequestParam(value = "dateNaissance", required = true) String dateNaissance, HttpServletRequest request,
+			Model uiModel, RedirectAttributes redirectAttrs) throws ParseException {
+		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+		String eppn = auth.getName();
+		Salle salleOK = null;
+		Gestionnaire gestionnaire = gestionnaireRepository.findGestionnairesByEppnEquals(eppn).getSingleResult();
+		List<Salle> salles = gestionnaire.getSalles();
+		for (Salle salle : salles) {
+			if (salle.getId() == id) {
+				salleOK = salle;
+				break;
+			}
+		}
+		if (request.isUserInRole("ROLE_ADMIN")) {
+			salleOK = salleRepository.findSalle(id);
+		}
+		if(salleOK != null) {
+			DateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.FRENCH);
+			if(etudiantRepository.countFindEtudiantsByNomEqualsAndPrenomEqualsAndDateNaissanceEquals(nom, prenom, format.parse(dateNaissance)) > 0) {
+				Etudiant etudiant = etudiantRepository.findEtudiantsByNomEqualsAndPrenomEqualsAndDateNaissanceEquals(nom, prenom, format.parse(dateNaissance)).getSingleResult();
+				if (tagService.checkEtudiant(etudiant, salleOK.getNom()) == null) {
+					tagService.debitCoupon(etudiant, salleOK.getNom(), eppn);
+					etudiantRepository.merge(etudiant);
+					redirectAttrs.addFlashAttribute("messageInfo", "message_info_debit_coupon");
+				} else {
+					redirectAttrs.addFlashAttribute("messageError", "message_error_coupon");
+				}
+				
+			} else {
+				redirectAttrs.addFlashAttribute("messageError", "message_error_find_etudiant");
+			}
+		} else {
+			throw new AccessDeniedException("Ne gère pas cette salle");	
+		}
+				
+		return "redirect:/partenaire/salle/" + id + "/";
+	}
+	
 	@RequestMapping(value = "/salle/{id}/pdf")
-	public ModelAndView pdf(@PathVariable("id") long id,
+	@ResponseBody
+	public void pdf(@PathVariable("id") long id,
 			@RequestParam(value = "dateDebut", required = false) String dateDebut,
-			@RequestParam(value = "dateFin", required = false) String dateFin, HttpServletRequest request,
-			Model uiModel) throws ParseException {
+			@RequestParam(value = "dateFin", required = false) String dateFin, HttpServletRequest request, HttpServletResponse response,
+			Model uiModel) throws Exception {
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 		String eppn = auth.getName();
 		Salle salleOK = null;
 		if (!request.isUserInRole("ROLE_ADMIN")) {
-			Gestionnaire gestionnaire = Gestionnaire.findGestionnairesByEppnEquals(eppn).getSingleResult();
+			Gestionnaire gestionnaire = gestionnaireRepository.findGestionnairesByEppnEquals(eppn).getSingleResult();
 			List<Salle> salles = gestionnaire.getSalles();
 			for (Salle salle : salles) {
 				if (salle.getId() == id) {
@@ -177,7 +233,7 @@ public class IndexPartenaireController {
 				}
 			}
 		} else {
-			salleOK = Salle.findSalle(id);
+			salleOK = salleRepository.findSalle(id);
 		}
 		if (salleOK == null && !request.isUserInRole("ROLE_ADMIN")) {
 			throw new AccessDeniedException("Ne gère pas cette salle");
@@ -187,7 +243,7 @@ public class IndexPartenaireController {
 		List<TagLog> tagLogs = null;
 		if (dateDebut == null && dateFin == null) {
 
-			tagLogs = TagLog.findTagLogsBySalle(salleOK).getResultList();
+			tagLogs = tagLogRepository.findTagLogsBySalle(salleOK).getResultList();
 		} else {
 			DateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.FRENCH);
 			Calendar calendarDebut = Calendar.getInstance();
@@ -202,7 +258,7 @@ public class IndexPartenaireController {
 			calendarFin.set(Calendar.SECOND, 59);
 			calendarFin.set(Calendar.HOUR_OF_DAY, 23);
 			dateFinOK = calendarFin.getTime();
-			tagLogs = TagLog.findTagLogsBySalleAndDateBetween(salleOK, dateDebutOK, dateFinOK).getResultList();
+			tagLogs = tagLogRepository.findTagLogsBySalleAndDateBetween(salleOK, dateDebutOK, dateFinOK).getResultList();
 		}
 
 		FactureModel factureModel = new FactureModel();
@@ -211,7 +267,8 @@ public class IndexPartenaireController {
 		factureModel.setDateFin(dateFinOK);
 		factureModel.setSalle(salleOK.getNom() + " " + salleOK.getLieu());
 
-		return new ModelAndView("pdfView", "factureModel", factureModel);
+		uiModel.addAttribute("factureModel", factureModel);
+		facturePDFBuilder.render(uiModel.asMap(), request, response);
 	}
 
 	void addDateTimeFormatPatterns(Model uiModel) {

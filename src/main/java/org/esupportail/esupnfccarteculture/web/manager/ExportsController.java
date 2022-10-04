@@ -17,26 +17,18 @@
  */
 package org.esupportail.esupnfccarteculture.web.manager;
 
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.lang.reflect.Field;
-import java.text.ParseException;
-import java.util.List;
-
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletResponse;
-
-import org.esupportail.esupnfccarteculture.domain.ExportAll;
-import org.esupportail.esupnfccarteculture.domain.ExportEmails;
-import org.esupportail.esupnfccarteculture.domain.TagLog;
-import org.esupportail.esupnfccarteculture.service.CsvService;
+import org.esupportail.esupnfccarteculture.entity.Etudiant;
+import org.esupportail.esupnfccarteculture.entity.ExportAll;
+import org.esupportail.esupnfccarteculture.entity.ExportEmails;
+import org.esupportail.esupnfccarteculture.repository.EtudiantRepository;
+import org.esupportail.esupnfccarteculture.repository.TagLogRepository;
 import org.esupportail.esupnfccarteculture.service.EtudiantService;
 import org.esupportail.esupnfccarteculture.service.ExportService;
 import org.esupportail.esupnfccarteculture.service.UtilsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -45,6 +37,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.supercsv.io.CsvBeanWriter;
 import org.supercsv.io.ICsvBeanWriter;
 import org.supercsv.prefs.CsvPreference;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.lang.reflect.Field;
+import java.text.ParseException;
+import java.util.List;
 
 @RequestMapping("/manager/exports")
 @Controller
@@ -67,11 +68,13 @@ public class ExportsController {
 	
 	@Resource
 	EtudiantService etudiantService;
-	
-	@Resource
-	CsvService csvService;
 
-	
+	@Resource
+	TagLogRepository tagLogRepository;
+
+	@Resource
+	EtudiantRepository etudiantRepository;
+
 	@ModelAttribute("active")
 	String getCurrentMenu() {
 		return "exports";
@@ -83,9 +86,9 @@ public class ExportsController {
 			annee = utilsService.getAnnee();
 		}
 		uiModel.addAttribute("chooseAnnee", annee);
-		uiModel.addAttribute("annees", TagLog.findAnnees());
+		uiModel.addAttribute("annees", tagLogRepository.findAnnees());
 		uiModel.addAttribute("annee", annee);
-		return "manager/exports";
+		return "jsp/manager/exports";
 	}
 
 	@RequestMapping(value = "/emails/{annee}", method = RequestMethod.GET)
@@ -156,6 +159,20 @@ public class ExportsController {
 			beanWriter.close();
 		}catch(Exception e){
 			log.error("interuption de l'export !", e);
+		}
+
+	}
+	
+	@Transactional
+	@RequestMapping(value = "/sync/{annee}", method = RequestMethod.GET)
+	public void sync(@ModelAttribute(value = "annee") Integer annee, HttpServletResponse response, Model uiModel) throws Exception {
+		
+		if(annee==null) {
+			annee = utilsService.getAnnee();
+		}
+		List<Etudiant> etudiants = etudiantRepository.findAllEtudiants();
+		for(Etudiant etudiant : etudiants) {
+			etudiantService.updateEtudiant(etudiant);
 		}
 
 	}

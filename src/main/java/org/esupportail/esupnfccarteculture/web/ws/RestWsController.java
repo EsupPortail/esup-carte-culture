@@ -17,10 +17,8 @@
  */
 package org.esupportail.esupnfccarteculture.web.ws;
 
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-
-import org.esupportail.esupnfccarteculture.domain.Etudiant;
+import org.esupportail.esupnfccarteculture.entity.Etudiant;
+import org.esupportail.esupnfccarteculture.repository.EtudiantRepository;
 import org.esupportail.esupnfccarteculture.service.EtudiantService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,34 +28,38 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import javax.annotation.Resource;
+
 @RequestMapping("/ws")
 @Controller
 public class RestWsController {
 
 	private final Logger log = LoggerFactory.getLogger(getClass());
-	
+
 	@Resource
 	EtudiantService etudiantService;
 
+	@Resource
+	EtudiantRepository etudiantRepository;
+
 	@RequestMapping(value="/ent", produces = "text/html")
-	public String entWebProxyPortletView(@RequestParam(required = false) String eppn, HttpServletRequest request, Model uiModel) {
+	public String entWebProxyPortletView(@RequestParam(required = false) String eppn, Model uiModel) {
 		Etudiant etudiant = null;
 		String coupons = null;
-		if(Etudiant.countFindEtudiantsByEppnEquals(eppn) > 0) {
+		if(etudiantRepository.countFindEtudiantsByEppnEquals(eppn) > 0) {
 			log.info("consultation ent pour : " + eppn);
-			etudiant = Etudiant.findEtudiantsByEppnEquals(eppn).getSingleResult();
+			etudiant = etudiantRepository.findEtudiantsByEppnEquals(eppn).getSingleResult();
 			coupons = etudiantService.affichageCoupons(etudiant);
 		}
 		uiModel.addAttribute("coupons", coupons);
 		return "ent/index";
 	}
-	
-	
+
 	@RequestMapping(value="/etudiant", produces = "application/json")
 	@ResponseBody
-	public Etudiant getEtudiantJson(@RequestParam(required = true) String eppn, HttpServletRequest request, Model uiModel) {
-		if(Etudiant.countFindEtudiantsByEppnEquals(eppn) > 0) {
-			return Etudiant.findEtudiantsByEppnEquals(eppn).getSingleResult();
+	public Etudiant getEtudiantJson(@RequestParam(required = true) String eppn) {
+		if(etudiantRepository.countFindEtudiantsByEppnEquals(eppn) > 0) {
+			return etudiantRepository.findEtudiantsByEppnEquals(eppn).getSingleResult();
 		}
 		return null;
 	}

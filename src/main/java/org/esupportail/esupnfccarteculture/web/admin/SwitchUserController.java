@@ -33,7 +33,7 @@ public class SwitchUserController {
 	
 	@RequestMapping
 	public String index(Model uiModel) {		
-		return "admin/su";
+		return "jsp/admin/su";
 	}
 
 }

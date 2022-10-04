@@ -17,12 +17,6 @@
  */
 package org.esupportail.esupnfccarteculture.ldap;
 
-import static org.springframework.ldap.query.LdapQueryBuilder.query;
-
-import java.util.List;
-
-import javax.naming.Name;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ldap.NameNotFoundException;
@@ -31,6 +25,11 @@ import org.springframework.ldap.core.LdapTemplate;
 import org.springframework.ldap.filter.AndFilter;
 import org.springframework.ldap.filter.EqualsFilter;
 import org.springframework.ldap.filter.LikeFilter;
+
+import javax.naming.Name;
+import java.util.List;
+
+import static org.springframework.ldap.query.LdapQueryBuilder.query;
 
 @SuppressWarnings("deprecation")
 public class PersonLdapDao {
@@ -75,7 +74,6 @@ public class PersonLdapDao {
 	
 	public List<PersonLdap> getPersonNamesByEppn(String eppn, String moreFilter) {
 		AndFilter filter = new AndFilter();
-		filter.and(new EqualsFilter("objectclass", "person"));
 		filter.and(new LikeFilter("eduPersonPrincipalName", eppn));
 		filter.and(query().filter(moreFilter).filter());
 		return ldapTemplate.search("", filter.encode(),

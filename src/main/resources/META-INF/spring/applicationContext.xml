@@ -27,20 +27,7 @@
         ${propertyKey}.
     -->
     <context:property-placeholder location="classpath*:META-INF/spring/*.properties"/>
- 
-    <!--
-        Turn on AspectJ @Configurable support. As a result, any time you
-        instantiate an object, Spring will attempt to perform dependency
-        injection on that object. This occurs for instantiation via the "new"
-        keyword, as well as via reflection. This is possible because AspectJ
-        is used to "weave" Roo-based applications at compile time. In effect
-        this feature allows dependency injection of any object at all in your
-        system, which is a very useful feature (without @Configurable you'd
-        only be able to dependency inject objects acquired from Spring or
-        subsequently presented to a specific Spring dependency injection
-        method). Roo applications use this useful feature in a number of
-        areas, such as @PersistenceContext injection into entities.
-    -->
+
     <context:spring-configured/>
     <!--
         This declaration will cause Spring to locate every @Component,
@@ -54,7 +41,7 @@
         are declared. The first ensures that Spring doesn't spend time
         introspecting Roo-specific ITD aspects. The second ensures Roo doesn't
         instantiate your @Controller classes, as these should be instantiated
-        by a web tier application context. Refer to web.xml for more details
+        by a web tier application context. Refer to web.xml.old.old for more details
         about the web tier application context setup services.
         
         Furthermore, this turns on @Autowired, @PostConstruct etc support. These 
@@ -64,7 +51,6 @@
         dependency inject an object into your class.
     -->
     <context:component-scan base-package="org.esupportail.esupnfccarteculture">
-        <context:exclude-filter expression=".*_Roo_.*" type="regex"/>
         <context:exclude-filter expression="org.springframework.stereotype.Controller" type="annotation"/>
     </context:component-scan>
     <bean class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close" id="dataSource">
@@ -81,26 +67,26 @@
         <property name="validationQuery" value="SELECT version();"/>
     </bean>	
 
-	<bean id="localeResolver" class="org.springframework.web.servlet.i18n.FixedLocaleResolver">
-		<property name="defaultLocale" value="fr" />
-	</bean>
-	
-    <bean class="org.springframework.orm.jpa.JpaTransactionManager" id="transactionManager">
-        <property name="entityManagerFactory" ref="entityManagerFactory"/>
-    </bean>
+<!--	<bean id="localeResolver" class="org.springframework.web.servlet.i18n.FixedLocaleResolver">-->
+<!--		<property name="defaultLocale" value="fr" />-->
+<!--	</bean>-->
+<!--	-->
+<!--    <bean class="org.springframework.orm.jpa.JpaTransactionManager" id="transactionManager">-->
+<!--        <property name="entityManagerFactory" ref="entityManagerFactory"/>-->
+<!--    </bean>-->
 
-    <tx:annotation-driven mode="aspectj" transaction-manager="transactionManager"/>
+<!--    <tx:annotation-driven transaction-manager="transactionManager"/>-->
 
-    <bean class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean" id="entityManagerFactory">
-        <property name="persistenceUnitName" value="persistenceUnit"/>
-        <property name="dataSource" ref="dataSource"/>
-    </bean>
+<!--    <bean class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean" id="entityManagerFactory">-->
+<!--        <property name="persistenceUnitName" value="persistenceUnit"/>-->
+<!--        <property name="dataSource" ref="dataSource"/>-->
+<!--    </bean>-->
 
 
-	<bean id="pdfViewResolver" class="org.springframework.web.servlet.view.ResourceBundleViewResolver">
-        <property name="order" value="1"/>
-        <property name="basename" value="views"/>
-    </bean>
+<!--	<bean id="pdfViewResolver" class="org.springframework.web.servlet.view.ResourceBundleViewResolver">-->
+<!--        <property name="order" value="1"/>-->
+<!--        <property name="basename" value="views"/>-->
+<!--    </bean>-->
 
 	<bean id="ldapTemplateUnivVille" class="org.springframework.ldap.core.LdapTemplate">  
 		<constructor-arg ref="ldapContextSourceUnivVille" />  
@@ -122,23 +108,39 @@
     	<property name="nbRechargeMax" value="3" />
     	<property name="typeSalles">
     		<list>
-    			<bean id="salleJoker" class="org.esupportail.esupnfccarteculture.domain.TypeSalleJoker">
-    				<property name="maxCoupon" value="1" />
+    			<bean id="salleJoker" class="org.esupportail.esupnfccarteculture.entity.TypeSalleJoker">
+    				<property name="maxCoupon">
+    					<map>
+    						<entry key="ETUDIANT" value="1" />
+    					</map>
+    				</property>
     				<property name="description" value="Coupon utilisable dans tous les types de salle" />
     			</bean>
-				<bean id="salleCinema" class="org.esupportail.esupnfccarteculture.domain.TypeSalle">
+				<bean id="salleCinema" class="org.esupportail.esupnfccarteculture.entity.TypeSalle">
     				<property name="nom" value="cinema" />
-    				<property name="maxCoupon" value="1" />
+    				 <property name="maxCoupon">
+    					<map>
+    						<entry key="ETUDIANT" value="1" />
+    					</map>
+    				</property>
     				<property name="description" value="Coupon cinéma" />
     			</bean>    			
-				<bean id="salleTheatre" class="org.esupportail.esupnfccarteculture.domain.TypeSalle">
+				<bean id="salleTheatre" class="org.esupportail.esupnfccarteculture.entity.TypeSalle">
     				<property name="nom" value="theatre" />
-    				<property name="maxCoupon" value="2" />
+    				<property name="maxCoupon">
+    					<map>
+    						<entry key="ETUDIANT" value="2" />
+    					</map>
+    				</property>
     				<property name="description" value="Coupon théatre" />
     			</bean>
-				<bean id="salleAutre" class="org.esupportail.esupnfccarteculture.domain.TypeSalle">
+				<bean id="salleAutre" class="org.esupportail.esupnfccarteculture.entity.TypeSalle">
     				<property name="nom" value="autre" />
-    				<property name="maxCoupon" value="3" />
+    				<property name="maxCoupon">
+    					<map>
+    						<entry key="ETUDIANT" value="3" />
+    					</map>
+    				</property>
     				<property name="description" value="Coupon autre" />
     			</bean>
     		</list>
@@ -148,12 +150,27 @@
     <bean id="etudiantService" class="org.esupportail.esupnfccarteculture.service.EtudiantService">
     	<property name="affichageDetailCoupons" value="true" />
     	<property name="preInscription" value="true" />
+		<property name="preInscriptionRecharge" value="true" />
     	<property name="preInscriptionNomSalle" value="Pré-inscription" />
-    	<property name="autorizedStudentLdapFilter" value="(|(eduPersonAffiliation=student)(eduPersonAffiliation=staff))" />
-	<property name="eppnFilterRegex" value=".*@univ-ville.fr|.*@univ-ville2.fr"/>
+    	<property name="autorizedStudentLdapFilter" value="(eduPersonAffiliation=*)" />
+		<property name="eppnFilterRegex" value=".*@univ-ville.fr"/>
     	<property name="ldapCsnSearchAttribut" value="supannRefId" />
     	<property name="ldapCsnMultiValueTag" value="{ISO15693}" />
     	<property name="ldapCsnMultiValueTagExtractRegex" value="^.*\{ISO15693\}([^;]*).*$" />
     </bean>
+
+	<bean id="ldapContextSourceUnivVille" class="org.springframework.ldap.core.support.LdapContextSource">
+		<property name="url" value="ldap://ldap.univ-ville.fr" />
+		<property name="base" value="dc=univ-ville,dc=fr" />
+		<property name="userDn" value="cn=carteculture,dc=univ-ville,dc=fr" />
+		<property name="password" value="XXXXXXXX" />
+	</bean>
+
+	<bean id="ldapContextSourceComue" class="org.springframework.ldap.core.support.LdapContextSource">
+		<property name="url" value="ldaps://ldap.comue.fr" />
+		<property name="base" value="dc=comue,dc=fr" />
+		<property name="userDn" value="cn=carteculture,ou=carteculture,ou=system,dc=comue,dc=fr" />
+		<property name="password" value="XXXXXXXX" />
+	</bean>
 
 </beans>

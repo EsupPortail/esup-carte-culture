@@ -17,35 +17,29 @@
  */
 package org.esupportail.esupnfccarteculture.web.ws;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-
-import org.esupportail.esupnfccarteculture.domain.EsupNfcTagLog;
-import org.esupportail.esupnfccarteculture.domain.Etudiant;
-import org.esupportail.esupnfccarteculture.domain.Gestionnaire;
-import org.esupportail.esupnfccarteculture.domain.Salle;
-import org.esupportail.esupnfccarteculture.domain.TagLogGest;
-import org.esupportail.esupnfccarteculture.domain.TypeSalleInscription;
+import org.esupportail.esupnfccarteculture.entity.*;
 import org.esupportail.esupnfccarteculture.ldap.PersonLdap;
+import org.esupportail.esupnfccarteculture.repository.EtudiantRepository;
+import org.esupportail.esupnfccarteculture.repository.GestionnaireRepository;
+import org.esupportail.esupnfccarteculture.repository.SalleRepository;
+import org.esupportail.esupnfccarteculture.repository.TagLogGestRepository;
 import org.esupportail.esupnfccarteculture.service.EtudiantService;
 import org.esupportail.esupnfccarteculture.service.TagService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
+
+import javax.annotation.Resource;
+import javax.persistence.NoResultException;
+import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 @RequestMapping("/nfc-ws")
 @Controller
@@ -58,14 +52,26 @@ public class NfcWsController {
 
 	@Resource
 	TagService tagService;
-	
+
+	@Resource
+	private SalleRepository salleRepository;
+
+	@Resource
+	private EtudiantRepository etudiantRepository;
+
+	@Resource
+	private GestionnaireRepository gestionnaireRepository;
+
+	@Resource
+	private TagLogGestRepository tagLogGestRepository;
+
 	@RequestMapping(value = "/tagIdCheck", method = RequestMethod.GET)
 	@ResponseBody
 	public EsupNfcTagLog tagIdCheck(@RequestParam(required = false) String desfireId,
 			@RequestParam(required = false) String csn) {
 		EsupNfcTagLog esupNfcTagLog = null;
-		if (Etudiant.countFindEtudiantsByCsnEquals(csn.toUpperCase()) > 0) {
-			Etudiant etudiant = Etudiant.findEtudiantsByCsnEquals(csn.toUpperCase()).getSingleResult();
+		if (etudiantRepository.countFindEtudiantsByCsnEquals(csn.toUpperCase()) > 0) {
+			Etudiant etudiant = etudiantRepository.findEtudiantsByCsnEquals(csn.toUpperCase()).getSingleResult();
 			esupNfcTagLog = new EsupNfcTagLog();
 			esupNfcTagLog.setCsn(etudiant.getCsn());
 			esupNfcTagLog.setEppn(etudiant.getEppn());
@@ -88,19 +94,20 @@ public class NfcWsController {
 	@RequestMapping(value = "/getLocations", method = RequestMethod.GET, produces = "application/json;charset=UTF-8")
 	@ResponseBody
 	public List<String> getLocations(@RequestParam String eppn) {
-		List<String> listSalles = new ArrayList<String>();
+		List<String> listSalles = new ArrayList<>();
 		try {
-			Gestionnaire gestionnaire = Gestionnaire.findGestionnairesByEppnEquals(eppn).getSingleResult();
-			if (gestionnaire != null) {
-				listSalles = new ArrayList<String>();
-				List<Salle> salles = gestionnaire.getSalles();
+			List<Gestionnaire> gestionnaires = gestionnaireRepository.findGestionnairesByEppnEquals(eppn).getResultList();
+			if (gestionnaires.size() > 0) {
+				listSalles = new ArrayList<>();
+				List<Salle> salles = gestionnaires.get(0).getSalles();
 				for (Salle salle : salles) {
 					listSalles.add(salle.getNom());
 				}
-
+			} else {
+				log.warn("L'utilisateur " + eppn + " n'est gestionnaire d'aucune salle");
 			}
-		} catch (EmptyResultDataAccessException e) {
-			log.warn("L'utilisateur n'est gestionnaire d'aucune salle");
+		} catch (NoResultException e) {
+			log.error("L'utilisateur " + eppn + " n'est gestionnaire d'aucune salle");
 		}
 		return listSalles;
 	}
@@ -110,15 +117,15 @@ public class NfcWsController {
 	@ResponseBody
 	public ResponseEntity<String> isTagable(@RequestBody EsupNfcTagLog esupNfcTagLog) {
 		HttpHeaders responseHeaders = new HttpHeaders();
-		Salle salle = Salle.findSallesByNomEquals(esupNfcTagLog.getLocation()).getSingleResult();
-		if(Gestionnaire.countFindGestionnairesByEppnEquals(esupNfcTagLog.getEppn()) == 0) {
+		Salle salle = salleRepository.findSallesByNomEquals(esupNfcTagLog.getLocation()).getSingleResult();
+		if(gestionnaireRepository.countFindGestionnairesByEppnEquals(esupNfcTagLog.getEppn()) == 0) {
 			if (salle.getTypeSalle().equals(TypeSalleInscription.getTypeSalleInscriptionSingleton().getNom())) {
-				if(Etudiant.countFindEtudiantsByEppnEquals(esupNfcTagLog.getEppn()) > 0) {
-					Etudiant etudiant = Etudiant.findEtudiantsByEppnEquals(esupNfcTagLog.getEppn()).getSingleResult();
+				if(etudiantRepository.countFindEtudiantsByEppnEquals(esupNfcTagLog.getEppn()) > 0) {
+					Etudiant etudiant = etudiantRepository.findEtudiantsByEppnEquals(esupNfcTagLog.getEppn()).getSingleResult();
 					if (tagService.checkRecharge(etudiant)) {
 						return new ResponseEntity<String>("OK", responseHeaders, HttpStatus.OK);
 					} else {
-						return new ResponseEntity<String>("\nRecharge impossible", responseHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
+						return new ResponseEntity<String>("\nRecharge impossible", responseHeaders, HttpStatus.EXPECTATION_FAILED);
 					}
 				} else {
 					PersonLdap person = etudiantService.getPersonFromEppn(esupNfcTagLog.getEppn());
@@ -147,11 +154,11 @@ public class NfcWsController {
 	@ResponseBody
 	public ResponseEntity<String> validateTag(@RequestBody EsupNfcTagLog esupNfcTagLog, HttpServletRequest httpServletRequest) {
 		HttpHeaders responseHeaders = new HttpHeaders();
-		Salle salle = Salle.findSallesByNomEquals(esupNfcTagLog.getLocation()).getSingleResult();
-		if(Gestionnaire.countFindGestionnairesByEppnEquals(esupNfcTagLog.getEppn()) == 0) {
+		Salle salle = salleRepository.findSallesByNomEquals(esupNfcTagLog.getLocation()).getSingleResult();
+		if(gestionnaireRepository.countFindGestionnairesByEppnEquals(esupNfcTagLog.getEppn()) == 0) {
 			if (salle.getTypeSalle().equals(TypeSalleInscription.getTypeSalleInscriptionSingleton().getNom())) {
-				if(Etudiant.countFindEtudiantsByEppnEquals(esupNfcTagLog.getEppn()) > 0) {
-					Etudiant etudiant = Etudiant.findEtudiantsByEppnEquals(esupNfcTagLog.getEppn()).getSingleResult();
+				if(etudiantRepository.countFindEtudiantsByEppnEquals(esupNfcTagLog.getEppn()) > 0) {
+					Etudiant etudiant = etudiantRepository.findEtudiantsByEppnEquals(esupNfcTagLog.getEppn()).getSingleResult();
 					if(tagService.recharge(etudiant)) {
 						tagService.createNewTagLog(etudiant, salle, esupNfcTagLog.getEppnInit());
 					}
@@ -165,12 +172,10 @@ public class NfcWsController {
 					PersonLdap person = etudiantService.getPersonFromEppn(esupNfcTagLog.getEppn());
 					if(person != null) {
 						try {
-							Etudiant etudiant = new Etudiant();
-							etudiant.setEppn(esupNfcTagLog.getEppn());
-							etudiant.setDateInscription(new Date());
-							etudiantService.updateEtudiant(etudiant);
+							Etudiant etudiant = new Etudiant(esupNfcTagLog.getEppn(), new Date(), person.getEduPersonAffiliation());
+							etudiantRepository.persist(etudiant);
 							tagService.recharge(etudiant);
-							etudiant.persist();
+							etudiantService.updateEtudiant(etudiant);
 							tagService.createNewTagLog(etudiant, salle, esupNfcTagLog.getEppnInit());
 						} catch (Exception e) {
 							log.error("erreur lors de l'inscription de l'etudiant", e);
@@ -183,8 +188,8 @@ public class NfcWsController {
 					}
 				}
 			} else {
-				if(Etudiant.countFindEtudiantsByEppnEquals(esupNfcTagLog.getEppn()) > 0) {
-					Etudiant etudiant = Etudiant.findEtudiantsByEppnEquals(esupNfcTagLog.getEppn()).getSingleResult();
+				if(etudiantRepository.countFindEtudiantsByEppnEquals(esupNfcTagLog.getEppn()) > 0) {
+					Etudiant etudiant = etudiantRepository.findEtudiantsByEppnEquals(esupNfcTagLog.getEppn()).getSingleResult();
 					if (tagService.debitCoupon(etudiant, esupNfcTagLog.getLocation(), esupNfcTagLog.getEppnInit())) {
 						try {
 							etudiantService.updateEtudiant(etudiant);
@@ -206,7 +211,7 @@ public class NfcWsController {
 			tagLogGest.setEppn(esupNfcTagLog.getEppn());
 			tagLogGest.setEppnInit(esupNfcTagLog.getEppnInit());
 			tagLogGest.setSalle(esupNfcTagLog.getLocation());
-			tagLogGest.persist();
+			tagLogGestRepository.persist(tagLogGest);
 			return new ResponseEntity<String>("OK", responseHeaders, HttpStatus.OK);
 		}
 	}
@@ -215,8 +220,8 @@ public class NfcWsController {
 	@ResponseBody
 	public String verso(@RequestBody EsupNfcTagLog taglog) {
 		log.info("get verso from : " + taglog);
-		if(Gestionnaire.countFindGestionnairesByEppnEquals(taglog.getEppn())==0){
-			Etudiant etudiant = Etudiant.findEtudiantsByEppnEquals(taglog.getEppn()).getSingleResult();
+		if(gestionnaireRepository.countFindGestionnairesByEppnEquals(taglog.getEppn())==0){
+			Etudiant etudiant = etudiantRepository.findEtudiantsByEppnEquals(taglog.getEppn()).getSingleResult();
 			return "Coupons restants : " + etudiantService.affichageCoupons(etudiant);
 		} else {
 			return "Le badgeage fonctionne !";

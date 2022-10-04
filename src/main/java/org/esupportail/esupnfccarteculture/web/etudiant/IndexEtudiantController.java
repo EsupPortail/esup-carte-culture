@@ -17,21 +17,13 @@
  */
 package org.esupportail.esupnfccarteculture.web.etudiant;
 
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-
-import javax.annotation.Resource;
-
-import org.esupportail.esupnfccarteculture.domain.Etudiant;
-import org.esupportail.esupnfccarteculture.domain.Salle;
-import org.esupportail.esupnfccarteculture.domain.TagLog;
-import org.esupportail.esupnfccarteculture.domain.TypeSalleInscription;
+import org.esupportail.esupnfccarteculture.entity.*;
 import org.esupportail.esupnfccarteculture.ldap.PersonLdap;
 import org.esupportail.esupnfccarteculture.ldap.PersonLdapDao;
+import org.esupportail.esupnfccarteculture.repository.EtudiantRepository;
+import org.esupportail.esupnfccarteculture.repository.GestionnaireRepository;
+import org.esupportail.esupnfccarteculture.repository.SalleRepository;
+import org.esupportail.esupnfccarteculture.repository.TagLogRepository;
 import org.esupportail.esupnfccarteculture.service.EtudiantService;
 import org.esupportail.esupnfccarteculture.service.TagService;
 import org.esupportail.esupnfccarteculture.service.UtilsService;
@@ -46,6 +38,14 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import javax.annotation.Resource;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 
 @RequestMapping("/etudiant")
 @Controller
@@ -70,6 +70,19 @@ public class IndexEtudiantController {
 	@Resource
 	UtilsService utilsService;
 	
+	@Resource
+	private SalleRepository salleRepository;
+
+	@Resource
+	private TagLogRepository tagLogRepository;
+	
+	@Resource
+	private EtudiantRepository etudiantRepository;
+
+	@Resource
+	private GestionnaireRepository gestionnaireRepository;
+
+	@Transactional
 	@RequestMapping(produces = "text/html")
 	public String index(Model uiModel) throws ParseException {
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -81,23 +94,32 @@ public class IndexEtudiantController {
 		Etudiant etudiant = null;
 		List<TagLog> tagLogs = null;
 		PersonLdap person = etudiantService.getPersonFromEppn(eppn);
+		List<Gestionnaire> gestionnaires = gestionnaireRepository.findGestionnairesByEppnEquals(eppn).getResultList();
+		for(Gestionnaire gestionnaire : gestionnaires) {
+			for(Salle salle : gestionnaire.getSalles()) {
+				if(salle.getTypeSalle().equals("inscription")) {
+					return "redirect:/partenaire/salle/" + salle.getId() + "/";
+				}
+			}
+		}
+
 		if(person != null) {
 			statut = "OK";
-			if(Etudiant.countFindEtudiantsByEppnEquals(eppn) > 0) {
-				etudiant = Etudiant.findEtudiantsByEppnEquals(eppn).getSingleResult();
+			if(etudiantRepository.countFindEtudiantsByEppnEquals(eppn) > 0) {
+				etudiant = etudiantRepository.findEtudiantsByEppnEquals(eppn).getSingleResult();
 			}
 			if(etudiant != null) {
 				DateFormat format = new SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE);
 				Date dateBegin = format.parse("01/09/"+utilsService.getAnnee());
 				if(etudiant.getDateInscription().after(dateBegin)){
-					tagLogs = TagLog.findTagLogs(utilsService.getAnnee(), null, null, etudiant.getEppn(), null, null, "date", "desc").getResultList();
+					tagLogs = tagLogRepository.findTagLogs(utilsService.getAnnee(), null, null, etudiant.getEppn(), null, null, "date", "desc").getResultList();
 					String oldCsn = etudiant.getCsn();
 					try {
 						etudiantService.updateEtudiant(etudiant);
 					} catch (Exception e) {
 						log.error("erreur lors de la mise à jour de " + etudiant.getEppn(), e);
 					}
-					if(!oldCsn.equals(etudiant.getCsn())) {
+					if(oldCsn == null || !oldCsn.equals(etudiant.getCsn())) {
 						msg = "Votre nouvelle carte à bien été prise en compte";	
 					}
 					coupons = etudiantService.affichageCoupons(etudiant);
@@ -127,7 +149,7 @@ public class IndexEtudiantController {
 			}
 		} else {
 			msg = "Accès refusé, merci de contacter le service carte culture";
-			log.warn("essai de connexion de : " + eppn + " avec une mauvaise affiliation");
+			log.warn("essai de connexion de : " + eppn  + " non trouvé dans l'annuaire");
 		}
 		uiModel.addAttribute("taglogs", tagLogs);
 		uiModel.addAttribute("etudiant", etudiant);
@@ -136,7 +158,7 @@ public class IndexEtudiantController {
 		uiModel.addAttribute("statut", statut);
 		uiModel.addAttribute("csn", csn);
 		uiModel.addAttribute("isPreInscription", etudiantService.isPreInscription());
-		return "etudiant/index";
+		return "jsp/etudiant/index";
 	}
 	
 	@Transactional
@@ -146,38 +168,39 @@ public class IndexEtudiantController {
 		String eppn = auth.getName();
 		if(etudiantService.isPreInscription()) {
 			Salle salleInscription = null;
-			if(Salle.countFindSallesByNomEquals(etudiantService.getPreInscriptionNomSalle()) > 0 ) {
-				salleInscription = Salle.findSallesByNomEquals(etudiantService.getPreInscriptionNomSalle()).getSingleResult();
+			if(salleRepository.countFindSallesByNomEquals(etudiantService.getPreInscriptionNomSalle()) > 0 ) {
+				salleInscription = salleRepository.findSallesByNomEquals(etudiantService.getPreInscriptionNomSalle()).getSingleResult();
 			} else {
 				log.info("création salle Pré-inscription en base : " + etudiantService.getPreInscriptionNomSalle());
 				salleInscription = new Salle();
 				salleInscription.setNom(etudiantService.getPreInscriptionNomSalle());
 				salleInscription.setLieu("web");
 				salleInscription.setTypeSalle(TypeSalleInscription.getTypeSalleInscriptionSingleton().toString());
-				salleInscription.persist();
+				salleRepository.persist(salleInscription);
 			}
 			
 			PersonLdap person = etudiantService.getPersonFromEppn(eppn);
 			if(person != null) {
 				Etudiant etudiant = null;
-				if(Etudiant.countFindEtudiantsByEppnEquals(eppn) > 0 ) {
-					etudiant = Etudiant.findEtudiantsByEppnEquals(eppn).getSingleResult();
+				if(etudiantRepository.countFindEtudiantsByEppnEquals(eppn) > 0 ) {
+					etudiant = etudiantRepository.findEtudiantsByEppnEquals(eppn).getSingleResult();
 					DateFormat format = new SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE);
 					Date dateBegin = format.parse("31/08/"+utilsService.getAnnee());
 					if(etudiant.getDateInscription().after(dateBegin)){
 						return "redirect:/etudiant";
 					}
 				} else {
-					etudiant = new Etudiant();
-					etudiant.setEppn(eppn);
-					etudiant.persist();
+					etudiant = new Etudiant(eppn, new Date(),person.getEduPersonAffiliation());
+					etudiantRepository.persist(etudiant);
 				}
 				etudiant.setDateInscription(new Date());
 				etudiant.setCoupons(null);
 				etudiant.setNbRecharge(0);
 				try {
 					etudiantService.updateEtudiant(etudiant);
-					tagService.recharge(etudiant);
+					if(etudiantService.isPreInscriptionRecharge()) {
+						tagService.recharge(etudiant);
+					}
 					tagService.createNewTagLog(etudiant, salleInscription, eppn);
 					redirectAttrs.addFlashAttribute("messageInfo", "message_info_preinscription");
 					return "redirect:/etudiant";

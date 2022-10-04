@@ -17,20 +17,12 @@
  */
 package org.esupportail.esupnfccarteculture.web.manager;
 
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import org.esupportail.esupnfccarteculture.domain.Etudiant;
-import org.esupportail.esupnfccarteculture.domain.Salle;
-import org.esupportail.esupnfccarteculture.domain.TagLog;
-import org.esupportail.esupnfccarteculture.domain.TypeSalle;
+import org.esupportail.esupnfccarteculture.entity.Etudiant;
+import org.esupportail.esupnfccarteculture.entity.Salle;
+import org.esupportail.esupnfccarteculture.entity.TypeSalle;
+import org.esupportail.esupnfccarteculture.repository.EtudiantRepository;
+import org.esupportail.esupnfccarteculture.repository.SalleRepository;
+import org.esupportail.esupnfccarteculture.repository.TagLogRepository;
 import org.esupportail.esupnfccarteculture.service.StatsService;
 import org.esupportail.esupnfccarteculture.service.TagService;
 import org.esupportail.esupnfccarteculture.service.UtilsService;
@@ -42,6 +34,15 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+
+import javax.annotation.Resource;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RequestMapping("/manager/stats")
 @Controller
@@ -62,7 +63,16 @@ public class StatsController {
 	
 	@Resource
 	TagService tagService;
-	
+
+	@Resource
+	private SalleRepository salleRepository;
+
+	@Resource
+	private TagLogRepository tagLogRepository;
+
+	@Resource
+	private EtudiantRepository etudiantRepository;
+
 	@RequestMapping
 	public String index(@RequestParam(required = false, value="annee") Integer annee, Model uiModel) throws ParseException {
 		
@@ -74,27 +84,27 @@ public class StatsController {
 		Map<String, Integer> nbTags = new HashMap<String, Integer>();
 		for(TypeSalle typeSalle : tagService.getTypeSallesDebitables()) {
 			nbTags.put(typeSalle.getNom(), 0);
-			List<Salle> sallesAutres = Salle.findSallesByTypeSalle(typeSalle).getResultList();
+			List<Salle> sallesAutres = salleRepository.findSallesByTypeSalle(typeSalle).getResultList();
 			for (Salle salle : sallesAutres) {
 				int nbTmp = nbTags.get(typeSalle.getNom());
-				long nbSalle = TagLog.countFindTagLogsByDateBetweenAndSalle(df.parse("01/09/" + (annee)), df.parse("31/08/" + (annee + 1)), salle);
+				long nbSalle = tagLogRepository.countFindTagLogsByDateBetweenAndSalle(df.parse("01/09/" + (annee)), df.parse("31/08/" + (annee + 1)), salle);
 				nbTags.put(typeSalle.getNom(), (int) (nbTmp + nbSalle));
 			}
 			
 		}
 	
-		List<Etudiant> etudiants = Etudiant.findAllEtudiants();
+		List<Etudiant> etudiants = etudiantRepository.findAllEtudiants();
 
 		List<Etudiant> newEtu = etudiants.stream().filter(e -> e.getNbRecharge() > 0).collect(Collectors.toList());
 				
 		
-		uiModel.addAttribute("annees", TagLog.findAnnees());
+		uiModel.addAttribute("annees", tagLogRepository.findAnnees());
 		uiModel.addAttribute("annee", String.valueOf(annee));
 		uiModel.addAttribute("nbInscrit", etudiants.size());
 		uiModel.addAttribute("nbNewInscrit", newEtu.size());
 		uiModel.addAttribute("nbTags", nbTags);
 		uiModel.addAttribute("nbCoupon", statsService.countCoupon(annee));
-		return "manager/stats";
+		return "jsp/manager/stats";
 	}
 	
 	@RequestMapping(value="/chartJson", headers = "Accept=application/json; charset=utf-8")

@@ -17,14 +17,13 @@
  */
 package org.esupportail.esupnfccarteculture.batch;
 
-import java.util.List;
+import org.esupportail.esupnfccarteculture.entity.AppliVersion;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import javax.sql.DataSource;
-
-import org.esupportail.esupnfccarteculture.domain.AppliVersion;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 
 @Service

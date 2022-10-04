@@ -17,18 +17,17 @@
  */
 package org.esupportail.esupnfccarteculture.service;
 
-import java.util.List;
-
-import javax.annotation.Resource;
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
-
-import org.esupportail.esupnfccarteculture.domain.ExportAll;
-import org.esupportail.esupnfccarteculture.domain.ExportEmails;
+import org.esupportail.esupnfccarteculture.entity.ExportAll;
+import org.esupportail.esupnfccarteculture.entity.ExportEmails;
 import org.hibernate.transform.Transformers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import java.util.List;
 
 @Service
 public class ExportService {
@@ -48,7 +47,7 @@ public class ExportService {
 				+ "e.email as email, "
 				+ "e.eppn as eppn, "
 				+ "e.etablissement as etablissement, "
-				+ "(select sum(coupons) from etudiant_coupons as ec where ec.etudiant = e.id group by ec.etudiant) as nb_coupon, "
+				+ "(select sum(coupons) from etudiant_coupons as ec where ec.etudiant_id = e.id group by ec.etudiant_id) as nb_coupon, "
 				+ "e.nb_recharge as nb_recharge, "
 				+ "e.nom as nom, "
 				+ "e.prenom as prenom, "
@@ -63,7 +62,7 @@ public class ExportService {
 				+ "date_part('year',e.date_naissance) as annee_naissance, "
 				+ "e.niveau_etudes as niveau_etudes "
 				+ "from tag_log as tl, etudiant as e, salle as s "
-				+ "where tl.salle=s.id and tl.etudiant=e.id and tl.date between '" + annee + "-09-01' and '"+ (annee + 1) +"-08-31' order by tl.date";
+				+ "where tl.salle_id=s.id and tl.etudiant_id=e.id and tl.date between '" + annee + "-09-01' and '"+ (annee + 1) +"-08-31' order by tl.date";
 	
 		List<ExportAll> exports = entityManager.createNativeQuery(queryString).unwrap(org.hibernate.Query.class).setResultTransformer(Transformers.aliasToBean(ExportAll.class)).list();
 	

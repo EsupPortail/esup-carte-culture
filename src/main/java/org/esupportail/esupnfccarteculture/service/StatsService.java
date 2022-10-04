@@ -17,36 +17,41 @@
  */
 package org.esupportail.esupnfccarteculture.service;
 
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.annotation.Resource;
-import javax.persistence.EntityManager;
-import javax.persistence.Query;
-
-import org.apache.commons.lang3.StringUtils;
-import org.esupportail.esupnfccarteculture.domain.Etudiant;
-import org.esupportail.esupnfccarteculture.domain.TagLog;
-import org.esupportail.esupnfccarteculture.domain.TypeSalle;
-import org.esupportail.esupnfccarteculture.domain.TypeSalleInscription;
-import org.esupportail.esupnfccarteculture.domain.TypeSalleJoker;
-import org.springframework.stereotype.Service;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import org.apache.commons.lang3.StringUtils;
+import org.esupportail.esupnfccarteculture.entity.Etudiant;
+import org.esupportail.esupnfccarteculture.entity.TypeSalle;
+import org.esupportail.esupnfccarteculture.entity.TypeSalleInscription;
+import org.esupportail.esupnfccarteculture.entity.TypeSalleJoker;
+import org.esupportail.esupnfccarteculture.repository.EtudiantRepository;
+import org.esupportail.esupnfccarteculture.repository.TagLogRepository;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 @Service
 public class StatsService {
 
 	@Resource
 	TagService tagService;
+
+	@Resource
+	private TagLogRepository tagLogRepository;
+
+	@PersistenceContext
+	private EntityManager entityManager;
+
+	@Resource
+	private EtudiantRepository etudiantRepository;
 
 	private Map<String, Integer>  nbTags;
 	
@@ -67,26 +72,23 @@ public class StatsService {
 				"#990000", "#4B0C25" };
 	
 	public List<Object[]> countNumberTagByLocationInsc(int annee) {
-		EntityManager em = TagLog.entityManager();
-		Query q = em.createNativeQuery(
-				"SELECT s.lieu as labels, count(t.id) as value FROM tag_log as t, salle as s WHERE s.id=t.salle AND s.type_salle = 'inscription' AND date BETWEEN '" + annee + "-09-01' AND '" + (annee + 1) + "-08-31' GROUP BY s.id ORDER BY value DESC");
+		Query q = entityManager.createNativeQuery(
+				"SELECT s.lieu as labels, count(t.id) as value FROM tag_log as t, salle as s WHERE s.id=t.salle_id AND s.lieu != 'web' AND s.type_salle = 'inscription' AND date BETWEEN '" + annee + "-09-01' AND '" + (annee + 1) + "-08-31' GROUP BY s.id ORDER BY value DESC");
 		return q.getResultList();
 	}
 	
 
 	public List<Object[]> countNumberTagByLocationSalle(int annee) {
-		EntityManager em = TagLog.entityManager();
-		Query q = em.createNativeQuery(
-				"SELECT s.nom as labels, count(t.id) as value FROM tag_log as t, salle as s WHERE s.id=t.salle AND s.type_salle != 'inscription' AND date BETWEEN '" + annee + "-09-01' AND '" + (annee + 1) + "-08-31' GROUP BY s.id ORDER BY value DESC");
+		Query q = entityManager.createNativeQuery(
+				"SELECT s.nom as labels, count(t.id) as value FROM tag_log as t, salle as s WHERE s.id=t.salle_id AND s.type_salle != 'inscription' AND date BETWEEN '" + annee + "-09-01' AND '" + (annee + 1) + "-08-31' GROUP BY s.id ORDER BY value DESC");
 		return q.getResultList();
 	}
 
 	public List<Object[]> countNumberTagByWeekInsc(int annee) {
 		Object[] saut = {null, null, null};
 		List<Object[]> result = new ArrayList<Object[]>();
-		EntityManager em = TagLog.entityManager();
-		Query qInsc = em.createNativeQuery(
-				"SELECT  trim(to_char(date_part('month', tg.date), '99')) AS labels, COALESCE('coupons distribués') AS label, COUNT(sl.id) AS value, date_part('month', tg.date) AS groupby FROM tag_log AS tg LEFT JOIN (SELECT id FROM salle WHERE type_salle = '" + TypeSalleInscription.getTypeSalleInscriptionSingleton().getNom() + "') AS sl ON sl.id=tg.salle AND date BETWEEN '" + annee + "-09-01' AND '" + (annee + 1) + "-08-31' GROUP BY groupby ORDER BY max(tg.date);");
+		Query qInsc = entityManager.createNativeQuery(
+				"SELECT  trim(to_char(date_part('month', tg.date), '99')) AS labels, COALESCE('coupons distribués') AS label, COUNT(sl.id) AS value, date_part('month', tg.date) AS groupby FROM tag_log AS tg LEFT JOIN (SELECT id FROM salle WHERE type_salle = '" + TypeSalleInscription.getTypeSalleInscriptionSingleton().getNom() + "') AS sl ON sl.id=tg.salle_id AND date BETWEEN '" + annee + "-09-01' AND '" + (annee + 1) + "-08-31' GROUP BY groupby ORDER BY max(tg.date);");
 		List<Object[]> qResultInsc = qInsc.getResultList();
 		for (int i = 0; i< month.size(); i++){
 			Object[] objectToAdd = {month.get(i), "coupons distribués", 0};
@@ -103,12 +105,11 @@ public class StatsService {
 	public List<Object[]> countNumberTagByWeekUsed(int annee) {
 		Object[] saut = {null, null, null};
     	List<Object[]> result = new ArrayList<Object[]>();
-		EntityManager em = TagLog.entityManager();
 
 		for(TypeSalle typeSalle : tagService.getTypeSallesDebitables()) {
 			if(!typeSalle.getNom().equals(TypeSalleJoker.JOKER_NAME)) {
-				String queryString = "SELECT trim(to_char(date_part('month', tg.date), '99')) AS labels, COALESCE('coupons " + typeSalle.getNom() + " utilisés') as label, COUNT(sl.id) AS value, date_part('month', tg.date) AS groupby FROM tag_log AS tg LEFT JOIN (SELECT id FROM salle WHERE type_salle = '" + typeSalle.getNom() + "') AS sl ON sl.id=tg.salle AND date BETWEEN '" + annee + "-09-01' AND '" + (annee + 1) + "-08-31' GROUP BY groupby ORDER BY max(tg.date);";
-				Query query = em.createNativeQuery(queryString);
+				String queryString = "SELECT trim(to_char(date_part('month', tg.date), '99')) AS labels, COALESCE('coupons " + typeSalle.getNom() + " utilisés') as label, COUNT(sl.id) AS value, date_part('month', tg.date) AS groupby FROM tag_log AS tg LEFT JOIN (SELECT id FROM salle WHERE type_salle = '" + typeSalle.getNom() + "') AS sl ON sl.id=tg.salle_id AND date BETWEEN '" + annee + "-09-01' AND '" + (annee + 1) + "-08-31' GROUP BY groupby ORDER BY max(tg.date);";
+				Query query = entityManager.createNativeQuery(queryString);
 				List<Object[]> qResult = query.getResultList();
 				for (int i = 0; i< month.size(); i++){
 					Object[] objectToAdd = {month.get(i), "coupons " + typeSalle.getNom() + " utilisés", 0};
@@ -287,14 +288,13 @@ public class StatsService {
 	
     public Map<String, Integer> countCoupon(int annee) {
     	nbTags = null;
-    	List<Etudiant> etudiants = Etudiant.findEtudiants(annee, null, null, null, null, 10000, null, null).getResultList();
+    	List<Etudiant> etudiants = etudiantRepository.findEtudiants(annee, null, null, null, null, 10000, null, null).getResultList();
     	for(Etudiant etudiant : etudiants) {
     		if(nbTags == null) {
     			nbTags = new HashMap<String, Integer>(etudiant.getCoupons());
     		} else {
     			etudiant.getCoupons().forEach((k, v) -> nbTags.merge(k, v, Integer::sum));
     		}
-    		System.err.println(nbTags.get("joker"));
     	}
     	return nbTags;
     }
